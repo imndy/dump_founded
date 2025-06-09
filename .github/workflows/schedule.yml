@@ -14,10 +14,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install ipykernel jupyter
+          python -m ipykernel install --user --name python3 --display-name python3
 
       - name: Execute notebook
         run: |
-          papermill Holy_Grail.ipynb output.ipynb
+          papermill --kernel python3 Holy_Grail.ipynb output.ipynb
 
       - name: Commit results
         uses: stefanzweifel/git-auto-commit-action@v4
@@ -29,7 +31,6 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          # post a brief message plus attach the executed notebook
           curl -X POST $WEBHOOK_URL \
             -F "payload_json={\"content\":\"📋 **Active Orders Report**\",\"username\":\"TradeBot\"}" \
             -F "file=@output.ipynb"
