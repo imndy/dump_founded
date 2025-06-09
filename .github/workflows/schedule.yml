@@ -35,6 +35,9 @@ jobs:
           commit_message: "Scheduled run on $(date)"
           file_pattern: output.ipynb
 
+      - name: Make script executable
+        run: chmod +x ./send_to_discord.sh
+        
       - name: Send last cell output to Discord
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
