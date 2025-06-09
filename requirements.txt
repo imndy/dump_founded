@@ -1,0 +1,7 @@
+ccxt
+pandas
+pandas-ta
+ta
+matplotlib
+numpy
+papermill
