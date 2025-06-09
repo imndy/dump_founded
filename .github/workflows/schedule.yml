@@ -25,7 +25,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install ipykernel jupyter
+          pip install ipykernel jupyter papermill
           python -m ipykernel install --user --name python3 --display-name python3
 
       # 4) execute your notebook
