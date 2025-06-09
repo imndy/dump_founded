@@ -1,4 +1,9 @@
 name: Schedule
+
+# 1) allow write access so we can push output.ipynb back into the repo
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '0,15,30,45 * * * *'
@@ -7,30 +12,39 @@ on:
 jobs:
   run_notebook:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
 
-      - name: Set up Python
+    steps:
+      # 2) checkout with write creds
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      # 3) setup Python + Jupyter/kernel for papermill
+      - name: Set up Python & Jupyter
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install ipykernel jupyter
           python -m ipykernel install --user --name python3 --display-name python3
 
+      # 4) execute your notebook
       - name: Execute notebook
         run: |
           papermill --kernel python3 Holy_Grail.ipynb output.ipynb
 
+      # 5) commit the results back
       - name: Commit results
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           commit_message: "Scheduled run on $(date)"
           file_pattern: output.ipynb
 
+      # 6) send the output file up to your Discord webhook
       - name: Send report to Discord
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          curl -X POST $WEBHOOK_URL \
+          curl -X POST "$WEBHOOK_URL" \
             -F "payload_json={\"content\":\"📋 **Active Orders Report**\",\"username\":\"TradeBot\"}" \
             -F "file=@output.ipynb"
