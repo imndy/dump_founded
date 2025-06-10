@@ -73,24 +73,18 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          # Ensure summary.txt exists
           if [[ ! -f summary.txt ]]; then
             echo "⚠️ summary.txt not found, aborting."
             exit 1
           fi
-
-          # Read the entire file (could be multi-line)
+      
           BODY=$(< summary.txt)
-
-          # JSON‐encode safely (fallback if empty)
-          PAYLOAD=$(printf '%s' "$BODY" \
-            | python3 -c 'import sys,json; txt=sys.stdin.read().strip() or "No content to display."; print(json.dumps({"content": txt}))'
-          )
-
-          # Debug: show what we’ll send
+      
+          # Add code block formatting (```...```)
+          PAYLOAD=$(printf '```\n%s\n```' "$BODY" | python3 -c 'import sys, json; txt = sys.stdin.read().strip(); print(json.dumps({"content": txt}))')
+      
           echo "→ PAYLOAD: $PAYLOAD"
-
-          # POST to Discord
+      
           curl -X POST \
                -H "Content-Type: application/json" \
                -d "$PAYLOAD" \
