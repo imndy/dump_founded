@@ -71,34 +71,32 @@ jobs:
       - name: Convert notebook to Markdown
         if: steps.gate.outputs.skip == 'false'
         run: |
-          # install nbconvert if not already present
-          pip install nbconvert
-          jupyter nbconvert output.ipynb --to markdown --output output.md
+          pip install --user nbconvert
+          python3 -m nbconvert --to markdown output.ipynb --output output.md
 
-      - name: Send summary to Discord
+      - name: Send last 10 lines to Discord
         if: steps.gate.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          # grab the last 10 lines (no error if fewer than 10)
-          LAST_LINES=$(tail -n 10 output.md || true)
+        run: |   
+          # Pull up to 10 lines (no failure if <10 or empty)
+          LAST=$(tail -n10 output.md || true)
 
-          # build a JSON payload, fall back to default text if empty
-          PAYLOAD=$(printf '%s\n' "$LAST_LINES" \
-            | python3 - << 'PYCODE'
+          # Build a valid JSON payload (fallback if empty)
+          PAYLOAD=$(printf '%s\n' "$LAST" | python3 - << 'PYCODE'
           import sys, json
-          txt = sys.stdin.read()
-          if not txt.strip():
-              txt = "No content to display."
-          print(json.dumps({"content": txt}))
+          text = sys.stdin.read().strip()
+          if not text:
+              text = "No content to display."
+          print(json.dumps({"content": text}))
           PYCODE
-                    )
-          
-                    # debug output
-                    echo "→ Payload: $PAYLOAD"
-          
-                    # post to Discord
-                    curl -X POST \
-                         -H "Content-Type: application/json" \
-                         -d "$PAYLOAD" \
-                         "$WEBHOOK_URL"
+          )
+
+          # DEBUG: see exactly what will be sent
+          echo "→ PAYLOAD: $PAYLOAD"
+
+          # Fire off to Discord
+          curl -X POST \
+               -H "Content-Type: application/json" \
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"
