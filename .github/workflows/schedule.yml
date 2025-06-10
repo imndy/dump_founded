@@ -77,17 +77,25 @@ jobs:
             echo "⚠️ summary.txt not found, aborting."
             exit 1
           fi
-
-          # Read summary.txt and wrap in code block
+      
+          # Read the summary
           FORMATTED=$(cat summary.txt)
-          BLOCKED="```\n${FORMATTED}\n```"
-
-          # Escape and JSON-encode it safely
+      
+          # Safely wrap in triple backticks
+          BLOCKED=$(cat <<EOF
+          \`\`\`
+          $FORMATTED
+          \`\`\`
+          EOF
+          )
+      
+          # JSON-encode
           PAYLOAD=$(printf '%s' "$BLOCKED" | python3 -c 'import sys,json; print(json.dumps({"content": sys.stdin.read().strip()}))')
-
+      
           echo "→ PAYLOAD: $PAYLOAD"
-
+      
           curl -X POST \
                -H "Content-Type: application/json" \
                -d "$PAYLOAD" \
                "$WEBHOOK_URL"
+
