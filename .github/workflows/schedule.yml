@@ -23,8 +23,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Always run immediately if manually triggered
-            if (github.context.eventName === 'workflow_dispatch') {
+           // Always run immediately if manually triggered
+           if (context.eventName === 'workflow_dispatch') {
               core.setOutput('skip', 'false');
               return;
             }
