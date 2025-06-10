@@ -68,8 +68,37 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: chmod +x ./send_to_discord.sh
 
-      - name: Send last cell output to Discord
+      - name: Convert notebook to Markdown
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          # install nbconvert if not already present
+          pip install nbconvert
+          jupyter nbconvert output.ipynb --to markdown --output output.md
+
+      - name: Send summary to Discord
         if: steps.gate.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-        run: ./send_to_discord.sh
+        run: |
+          # grab the last 10 lines (no error if fewer than 10)
+          LAST_LINES=$(tail -n 10 output.md || true)
+
+          # build a JSON payload, fall back to default text if empty
+          PAYLOAD=$(printf '%s\n' "$LAST_LINES" \
+            | python3 - << 'PYCODE'
+          import sys, json
+          txt = sys.stdin.read()
+          if not txt.strip():
+              txt = "No content to display."
+          print(json.dumps({"content": txt}))
+          PYCODE
+                    )
+          
+                    # debug output
+                    echo "→ Payload: $PAYLOAD"
+          
+                    # post to Discord
+                    curl -X POST \
+                         -H "Content-Type: application/json" \
+                         -d "$PAYLOAD" \
+                         "$WEBHOOK_URL"
