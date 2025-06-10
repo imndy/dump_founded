@@ -68,7 +68,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: chmod +x ./send_to_discord.sh
 
-      - name: Send summary.txt to Discord
+      - name: Send formatted table to Discord
         if: steps.gate.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
@@ -77,14 +77,16 @@ jobs:
             echo "⚠️ summary.txt not found, aborting."
             exit 1
           fi
-      
-          BODY=$(< summary.txt)
-      
-          # Add code block formatting (```...```)
-          PAYLOAD=$(printf '```\n%s\n```' "$BODY" | python3 -c 'import sys, json; txt = sys.stdin.read().strip(); print(json.dumps({"content": txt}))')
-      
+
+          # Read summary.txt and wrap in code block
+          FORMATTED=$(cat summary.txt)
+          BLOCKED="```\n${FORMATTED}\n```"
+
+          # Escape and JSON-encode it safely
+          PAYLOAD=$(printf '%s' "$BLOCKED" | python3 -c 'import sys,json; print(json.dumps({"content": sys.stdin.read().strip()}))')
+
           echo "→ PAYLOAD: $PAYLOAD"
-      
+
           curl -X POST \
                -H "Content-Type: application/json" \
                -d "$PAYLOAD" \
