@@ -5,19 +5,41 @@ permissions:
 
 on:
   schedule:
-   # - cron: '0,15,30,45 * * * *'
-  workflow_dispatch:
+    - cron: '*/15 * * * *'        # every 15 minutes (UTC)
+  workflow_dispatch: {}           # manual trigger
+
+concurrency:
+  group: cron-${{ github.workflow }}
+  cancel-in-progress: false       # queue one pending run; don’t cancel in-flight
 
 jobs:
   run_notebook:
     runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Gate until first run
+        uses: actions/github-script@v6
+        id: gate
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const now = new Date();
+            // ← replace with your desired first run in UTC
+            const startDate = new Date('2025-06-15T03:00:00Z');
+            core.setOutput('skip', now < startDate ? 'true' : 'false');
+
+      - name: Skip early runs
+        if: steps.gate.outputs.skip == 'true'
+        run: echo "🔒 Waiting for first run time..."
+
+      - name: Checkout repository
+        if: steps.gate.outputs.skip == 'false'
+        uses: actions/checkout@v3
         with:
           persist-credentials: true
 
       - name: Set up Python & Jupyter
+        if: steps.gate.outputs.skip == 'false'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -25,10 +47,12 @@ jobs:
           python -m ipykernel install --user --name python3 --display-name python3
 
       - name: Execute notebook
+        if: steps.gate.outputs.skip == 'false'
         run: |
           papermill --kernel python3 Holy_Grail.ipynb output.ipynb
 
       - name: Commit results
+        if: steps.gate.outputs.skip == 'false'
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -36,10 +60,11 @@ jobs:
           file_pattern: output.ipynb
 
       - name: Make script executable
+        if: steps.gate.outputs.skip == 'false'
         run: chmod +x ./send_to_discord.sh
-        
+
       - name: Send last cell output to Discord
+        if: steps.gate.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
         run: ./send_to_discord.sh
-
