@@ -1,21 +1,33 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-OUTPUT=$(python3 -c "
-import nbformat
-nb = nbformat.read(open('output.ipynb'), as_version=4)
-cells = [c for c in nb.cells if c.cell_type == 'code' and 'outputs' in c]
-if cells and cells[-1]['outputs']:
-    out = cells[-1]['outputs'][0]
-    if out['output_type'] == 'stream':
-        print(out.get('text', '[No stream text]'))
-    else:
-        print('[Unsupported output format: ' + out['output_type'] + ']')
-else:
-    print('[No output found]')
-")
+# Ensure the webhook URL is provided
+: "${WEBHOOK_URL:?Need to set WEBHOOK_URL}"
 
-ESCAPED_OUTPUT=$(echo "$OUTPUT" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+# 1) Extract the final cell’s last non-empty line
+MESSAGE="$(python3 - << 'PYCODE'
+import json, sys
+nb = json.load(open('output.ipynb'))
+cells = nb.get('cells', [])
+if not cells:
+    sys.exit(1)
+for out in reversed(cells[-1].get('outputs', [])):
+    if out.get('output_type') == 'stream':
+        text = ''.join(out.get('text', []))
+        lines = [l for l in text.splitlines() if l.strip()]
+        if lines:
+            print(lines[-1])
+            sys.exit(0)
+# nothing found
+sys.exit(1)
+PYCODE
+)"
 
-curl -X POST "$WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -d "{\"content\": \"📋 **Active Orders Report**\\n\`\`\`\n$ESCAPED_OUTPUT\n\`\`\`\"}"
+# 2) JSON-escape it
+ESCAPED=$(printf '%s' "$MESSAGE" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read())[1:-1])')
+
+# 3) Send to Discord
+curl -X POST \
+     -H "Content-Type: application/json" \
+     -d "{\"content\":\"$ESCAPED\"}" \
+     "$WEBHOOK_URL"
