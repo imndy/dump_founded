@@ -30,7 +30,7 @@ jobs:
             }
             // Otherwise (schedule), compare timestamps
             const now      = new Date();
-            const startAt  = new Date('2025-06-15T03:00:00Z');
+            const startAt  = new Date('2025-06-09T03:00:00Z');
             core.setOutput('skip', now < startAt ? 'true' : 'false');
 
       - name: Skip early runs
