@@ -23,10 +23,15 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const now = new Date();
-            // ← replace with your desired first run in UTC
-            const startDate = new Date('2025-06-15T03:00:00Z');
-            core.setOutput('skip', now < startDate ? 'true' : 'false');
+            // Always run immediately if manually triggered
+            if (github.context.eventName === 'workflow_dispatch') {
+              core.setOutput('skip', 'false');
+              return;
+            }
+            // Otherwise (schedule), compare timestamps
+            const now      = new Date();
+            const startAt  = new Date('2025-06-15T03:00:00Z');
+            core.setOutput('skip', now < startAt ? 'true' : 'false');
 
       - name: Skip early runs
         if: steps.gate.outputs.skip == 'true'
