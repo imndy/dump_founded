@@ -23,14 +23,14 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-           // Always run immediately if manually triggered
-           if (context.eventName === 'workflow_dispatch') {
+            // Always run immediately if manually triggered
+            if (context.eventName === 'workflow_dispatch') {
               core.setOutput('skip', 'false');
               return;
             }
             // Otherwise (schedule), compare timestamps
-            const now      = new Date();
-            const startAt  = new Date('2025-06-09T03:00:00Z');
+            const now     = new Date();
+            const startAt = new Date('2025-06-09T03:00:00Z');
             core.setOutput('skip', now < startAt ? 'true' : 'false');
 
       - name: Skip early runs
@@ -68,34 +68,29 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: chmod +x ./send_to_discord.sh
 
-      - name: Convert notebook to Markdown
-        if: steps.gate.outputs.skip == 'false'
-        run: |
-          pip install --user nbconvert
-          python3 -m nbconvert --to markdown output.ipynb --output output.md
-
-      - name: Send last 10 lines to Discord
+      - name: Send summary.txt to Discord
         if: steps.gate.outputs.skip == 'false'
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |   
-          # Pull up to 10 lines (no failure if <10 or empty)
-          LAST=$(tail -n10 output.md || true)
+        run: |
+          # Ensure summary.txt exists
+          if [[ ! -f summary.txt ]]; then
+            echo "⚠️ summary.txt not found, aborting."
+            exit 1
+          fi
 
-          # Build a valid JSON payload (fallback if empty)
-          PAYLOAD=$(printf '%s\n' "$LAST" | python3 - << 'PYCODE'
-          import sys, json
-          text = sys.stdin.read().strip()
-          if not text:
-              text = "No content to display."
-          print(json.dumps({"content": text}))
-          PYCODE
+          # Read the entire file (could be multi-line)
+          BODY=$(< summary.txt)
+
+          # JSON‐encode safely (fallback if empty)
+          PAYLOAD=$(printf '%s' "$BODY" \
+            | python3 -c 'import sys,json; txt=sys.stdin.read().strip() or "No content to display."; print(json.dumps({"content": txt}))'
           )
 
-          # DEBUG: see exactly what will be sent
+          # Debug: show what we’ll send
           echo "→ PAYLOAD: $PAYLOAD"
 
-          # Fire off to Discord
+          # POST to Discord
           curl -X POST \
                -H "Content-Type: application/json" \
                -d "$PAYLOAD" \
